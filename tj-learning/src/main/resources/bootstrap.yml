@@ -3,6 +3,8 @@ server:
   tomcat:
     uri-encoding: UTF-8   #服务编码
 spring:
+  main:
+    allow-circular-references: true
   profiles:
     active: dev
   application:
@@ -24,6 +26,7 @@ spring:
             refresh: false
           - data-id: shared-mq.yaml # 共享mq配置
             refresh: false
+
 tj:
   swagger:
     enable: true
