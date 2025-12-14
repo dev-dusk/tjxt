@@ -15,6 +15,7 @@ import com.tianji.learning.enums.SectionType;
 import com.tianji.learning.mapper.LearningRecordMapper;
 import com.tianji.learning.service.ILearningLessonService;
 import com.tianji.learning.service.ILearningRecordService;
+import com.tianji.learning.utils.LearningRecordDelayTaskHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,11 +39,11 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper, LearningRecord> implements ILearningRecordService {
 
-    private final LearningRecordMapper learningRecordMapper;
-
     private final ILearningLessonService learningLessonService;
 
     private final CourseClient courseClient;
+
+    private final LearningRecordDelayTaskHandler learningRecordDelayTaskHandler;
 
     /**
      * 查询当前用户指定课程的学习进度
@@ -109,20 +110,23 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
             return;
         }
         // 第一次学习，判断小节是否达到完成
-        Boolean isFinished = formDTO.getMoment() >= formDTO.getDuration() / 2 && !learningRecord.getFinished();
+        boolean isFinished = formDTO.getMoment() >= formDTO.getDuration() / 2;
         if (isFinished) {
             learningRecord.setFinished(true);
             learningRecord.setMoment(formDTO.getMoment());
             learningRecord.setFinishTime(formDTO.getCommitTime());
             learningRecord.setUpdateTime(formDTO.getCommitTime());
             this.updateById(learningRecord);
+            processLessons(formDTO, true);
+            learningRecordDelayTaskHandler.cleanRecordCache(formDTO.getLessonId(), formDTO.getSectionId());
         } else {
             // 未完成，更新学习记录
             learningRecord.setUpdateTime(formDTO.getCommitTime());
             learningRecord.setMoment(formDTO.getMoment());
-            this.updateById(learningRecord);
+//            this.updateById(learningRecord);
+            // 缓存到redis，添加延迟队列任务
+            learningRecordDelayTaskHandler.addLearningRecordTask(learningRecord);
         }
-        processLessons(formDTO, isFinished);
     }
 
 
