@@ -5,6 +5,7 @@ import com.tianji.api.client.course.CategoryClient;
 import com.tianji.api.dto.course.CategoryBasicDTO;
 import com.tianji.common.utils.CollUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,8 +32,8 @@ public class CategoryCache {
         });
     }
 
-    public String getCategoryNames(List<Long> ids) {
-        if (ids == null || ids.size() == 0) {
+    public String getCategoryNames(@Nullable List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
             return "";
         }
         // 1.读取分类缓存
