@@ -12,4 +12,5 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
  */
 public interface PointsBoardMapper extends BaseMapper<PointsBoard> {
 
+    void createDynamicTable(String tableName);
 }
