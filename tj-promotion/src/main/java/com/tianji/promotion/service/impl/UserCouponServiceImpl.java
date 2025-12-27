@@ -9,6 +9,7 @@ import com.tianji.promotion.enums.CouponStatus;
 import com.tianji.promotion.mapper.CouponMapper;
 import com.tianji.promotion.mapper.UserCouponMapper;
 import com.tianji.promotion.service.IUserCouponService;
+import com.tianji.promotion.utils.MyLock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.aop.framework.AopContext;
@@ -48,6 +49,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 
     /**
      * 领取优惠券接口
+     *
      * @param couponId
      */
     @Override
@@ -55,20 +57,21 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         // 优惠劵校验
         Coupon coupon = couponMapper.selectById(couponId);
         AssertCoupon(coupon);
-        
+
         // 获取当前用户ID
         Long userId = UserContext.getUser();
         // 获取该用户的锁
-        ReentrantLock lock = getUserLock(userId);
-        lock.lock();
-        try {
-            UserCouponServiceImpl currentProxy = (UserCouponServiceImpl)AopContext.currentProxy();
-            currentProxy.deUserCoupon(couponId, coupon, userId);
-        } finally {
-            lock.unlock();
-        }
+//        ReentrantLock lock = getUserLock(userId);
+//        lock.lock();
+//        try {
+        UserCouponServiceImpl currentProxy = (UserCouponServiceImpl) AopContext.currentProxy();
+        currentProxy.deUserCoupon(couponId, coupon, userId);
+//        } finally {
+//            lock.unlock();
+//        }
     }
 
+    @MyLock(key = "lock:coupon:#{T(com.tianji.common.utils.UserContext).getUser()}")
     @Transactional
     public void deUserCoupon(Long couponId, Coupon coupon, Long userId) {
         // 判断是否超出限领数量（加锁后再次检查）
@@ -98,6 +101,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 
     /**
      * 优惠劵领取校验
+     *
      * @param coupon
      */
     private void AssertCoupon(Coupon coupon) {
@@ -106,12 +110,12 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
             throw new BizIllegalException("优惠劵不存在");
         }
         // 是否正在发放
-        if (coupon.getStatus() !=  CouponStatus.ISSUING) {
-             throw new BizIllegalException("优惠劵未在发放中");
+        if (coupon.getStatus() != CouponStatus.ISSUING) {
+            throw new BizIllegalException("优惠劵未在发放中");
         }
         // 判断库存是否充足
         if (coupon.getIssueNum() >= coupon.getTotalNum()) {
-             throw new BizIllegalException("优惠劵已发放完毕");
+            throw new BizIllegalException("优惠劵已发放完毕");
         }
     }
 
@@ -120,7 +124,6 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
     public void exchangeCoupon(String code) {
 
     }
-
 
 
 }
