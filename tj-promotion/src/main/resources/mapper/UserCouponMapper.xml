@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tianji.promotion.mapper.UserCouponMapper">
+
+    <update id="updateIssueNum">
+        update coupon
+        set issue_num = issue_num + 1
+        where id = #{id} and issue_num &lt; total_num
+    </update>
+
+</mapper>

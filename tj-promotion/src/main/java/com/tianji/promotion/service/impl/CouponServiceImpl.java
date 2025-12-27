@@ -1,21 +1,26 @@
 package com.tianji.promotion.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.tianji.common.domain.dto.PageDTO;
 import com.tianji.common.utils.BeanUtils;
 import com.tianji.common.utils.CollUtils;
 import com.tianji.common.utils.StringUtils;
+import com.tianji.common.utils.UserContext;
 import com.tianji.promotion.domain.dto.CouponFormDTO;
 import com.tianji.promotion.domain.dto.CouponIssueFormDTO;
 import com.tianji.promotion.domain.po.Coupon;
 import com.tianji.promotion.domain.po.CouponScope;
+import com.tianji.promotion.domain.po.UserCoupon;
 import com.tianji.promotion.domain.query.CouponQuery;
 import com.tianji.promotion.domain.vo.CouponPageVO;
+import com.tianji.promotion.domain.vo.CouponVO;
 import com.tianji.promotion.enums.CouponStatus;
 import com.tianji.promotion.enums.ObtainType;
 import com.tianji.promotion.mapper.CouponMapper;
+import com.tianji.promotion.mapper.UserCouponMapper;
 import com.tianji.promotion.service.ICouponScopeService;
 import com.tianji.promotion.service.ICouponService;
 import com.tianji.promotion.service.IExchangeCodeService;
@@ -25,6 +30,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -43,6 +49,8 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
     private final ICouponScopeService couponScopeService;
 
     private final IExchangeCodeService exchangeCodeService;
+
+    private final UserCouponMapper userCouponMapper;
 
     /**
      * 新增优惠券接口
@@ -133,6 +141,37 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         }
     }
 
+
+    /**
+     * 查询发放中的优惠券列表
+     * @return
+     */
+    @Override
+    public List<CouponVO> queryIssuingCoupons() {
+        List<Coupon> couponList = lambdaQuery()
+                .eq(Coupon::getStatus, CouponStatus.ISSUING)
+                .eq(Coupon::getObtainWay, ObtainType.PUBLIC)
+                .list();
+        if (CollUtils.isEmpty(couponList)) {
+            return List.of();
+        }
+        List<UserCoupon> userCouponList = userCouponMapper.selectList(new LambdaQueryWrapper<UserCoupon>()
+                .eq(UserCoupon::getUserId, UserContext.getUser()));
+        Map<Long, Long> issuedMap = userCouponList.stream()
+                .collect(Collectors.groupingBy(UserCoupon::getCouponId, Collectors.counting()));
+        List<CouponVO> couponVOList = couponList.stream().map(coupon -> {
+            CouponVO couponVO = BeanUtil.copyProperties(coupon, CouponVO.class);
+            // 是否可以领取
+            boolean isAvail = coupon.getIssueNum() < coupon.getTotalNum()
+                    && issuedMap.getOrDefault(coupon.getId(), 0L) < coupon.getUserLimit();
+            couponVO.setAvailable(isAvail);
+            // 是否可以使用
+            couponVO.setReceived(issuedMap.getOrDefault(coupon.getId(), 0L) > 0L);
+            return couponVO;
+        }).collect(Collectors.toList());
+        log.info("查询发放中的优惠券列表成功：{}", couponVOList);
+        return couponVOList;
+    }
 
 
 
