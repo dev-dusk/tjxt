@@ -8,17 +8,22 @@ import com.tianji.common.utils.BeanUtils;
 import com.tianji.common.utils.CollUtils;
 import com.tianji.common.utils.StringUtils;
 import com.tianji.promotion.domain.dto.CouponFormDTO;
+import com.tianji.promotion.domain.dto.CouponIssueFormDTO;
 import com.tianji.promotion.domain.po.Coupon;
 import com.tianji.promotion.domain.po.CouponScope;
 import com.tianji.promotion.domain.query.CouponQuery;
 import com.tianji.promotion.domain.vo.CouponPageVO;
+import com.tianji.promotion.enums.CouponStatus;
+import com.tianji.promotion.enums.ObtainType;
 import com.tianji.promotion.mapper.CouponMapper;
 import com.tianji.promotion.service.ICouponScopeService;
 import com.tianji.promotion.service.ICouponService;
+import com.tianji.promotion.service.IExchangeCodeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -36,6 +41,8 @@ import java.util.stream.Collectors;
 public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> implements ICouponService {
 
     private final ICouponScopeService couponScopeService;
+
+    private final IExchangeCodeService exchangeCodeService;
 
     /**
      * 新增优惠券接口
@@ -88,6 +95,42 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         List<CouponPageVO> list = BeanUtils.copyList(records, CouponPageVO.class);
         // 3.返回
         return PageDTO.of(page, list);
+    }
+
+
+    /**
+     * 发放优惠券接口
+     * @param dto
+     */
+    @Override
+    public void beginIssue(CouponIssueFormDTO dto) {
+        // 状态判断
+        Coupon couponById = getById(dto.getId());
+        if (couponById == null) {
+            log.warn("优惠券不存在：{}", dto.getId());
+            return;
+        }
+        if (couponById.getStatus() != CouponStatus.DRAFT
+                && couponById.getStatus() != CouponStatus.PAUSE) {
+            log.warn("优惠券状态异常：{}", couponById.getStatus());
+            return;
+        }
+        BeanUtil.copyProperties(dto, couponById);
+        // 发放方式判断
+        LocalDateTime issueBeginTime = dto.getIssueBeginTime();
+        boolean isBegin = issueBeginTime == null || issueBeginTime.isBefore(LocalDateTime.now());
+        if (isBegin) {
+            couponById.setStatus(CouponStatus.ISSUING);
+            couponById.setIssueBeginTime(LocalDateTime.now());
+        } else {
+            couponById.setStatus(CouponStatus.DRAFT);
+        }
+        updateById(couponById);
+        // 优惠卷发送
+        if (couponById.getObtainWay() == ObtainType.ISSUE
+                && couponById.getStatus() == CouponStatus.DRAFT) {
+            exchangeCodeService.asyncGenerateCode(couponById);
+        }
     }
 
 
